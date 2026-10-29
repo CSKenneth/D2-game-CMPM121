@@ -1,4 +1,3 @@
-// Imports sticker images from the assets folder
 import crueltyUrl from "./assets/cruelty.png";
 import curiosityUrl from "./assets/curiosity.png";
 import falsityUrl from "./assets/falsity.png";
@@ -149,14 +148,19 @@ type Point = {
   y: number;
 };
 
-type Stroke = {
+// Shared rendering operation for every recorded drawing command
+type DrawingCommand = {
+  draw(context: CanvasRenderingContext2D): void;
+};
+
+type Stroke = DrawingCommand & {
   kind: "stroke";
   points: Point[];
   color: string;
   lineWidth: number;
 };
 
-type PlacedSticker = {
+type PlacedSticker = DrawingCommand & {
   kind: "sticker";
   x: number;
   y: number;
@@ -174,34 +178,163 @@ const drawingDocument: DrawingDocument = {
   items: [],
 };
 
-// Tracks drawing state
+// Tracks the currently selected tool separately from drawing data
+type SelectedTool =
+  | { kind: "brush" }
+  | { kind: "sticker"; sticker: HTMLCanvasElement };
+
+let selectedTool: SelectedTool = { kind: "brush" };
+
+// Tracks the temporary stroke separately from committed content
 let isDrawing = false;
 let currentStroke: Stroke | null = null;
+let activePointerId: number | null = null;
 
 const redoStack: Item[] = [];
 
-// Tracks sticker state
+// Stores available sticker tools
 const stickers: HTMLCanvasElement[] = [];
-let selectedSticker: HTMLCanvasElement | null = null;
 
-// Undoes the most recent drawing or sticker placement
+// Creates a stroke command that can draw on any canvas context
+function createStroke(
+  points: Point[],
+  color: string,
+  lineWidth: number,
+): Stroke {
+  const stroke: Stroke = {
+    kind: "stroke",
+    points,
+    color,
+    lineWidth,
+
+    // Draws this command using the supplied context
+    draw(context) {
+      drawStroke(context, stroke);
+    },
+  };
+
+  return stroke;
+}
+
+// Creates a sticker command that can draw on any canvas context
+function createStickerCommand(
+  image: HTMLCanvasElement,
+  x: number,
+  y: number,
+): PlacedSticker {
+  const sticker: PlacedSticker = {
+    kind: "sticker",
+    x,
+    y,
+    image,
+
+    // Draws this command using the supplied context
+    draw(context) {
+      context.drawImage(sticker.image, sticker.x, sticker.y);
+    },
+  };
+
+  return sticker;
+}
+
+// Draws a stroke without depending on the interactive canvas context
+function drawStroke(
+  context: CanvasRenderingContext2D,
+  stroke: Stroke,
+) {
+  if (stroke.points.length === 0) {
+    return;
+  }
+
+  // Prevents this command's drawing settings from affecting other commands
+  context.save();
+
+  context.strokeStyle = stroke.color;
+  context.fillStyle = stroke.color;
+  context.lineWidth = stroke.lineWidth;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+
+  // Draws a dot if the user only clicked once
+  if (stroke.points.length === 1) {
+    const point = stroke.points[0];
+
+    context.beginPath();
+    context.arc(
+      point.x,
+      point.y,
+      stroke.lineWidth / 2,
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+
+    context.restore();
+    return;
+  }
+
+  context.beginPath();
+  context.moveTo(stroke.points[0].x, stroke.points[0].y);
+
+  for (let i = 1; i < stroke.points.length; i++) {
+    context.lineTo(stroke.points[i].x, stroke.points[i].y);
+  }
+
+  context.stroke();
+  context.restore();
+}
+
+// Draws any recorded command using the target context
+function drawItem(context: CanvasRenderingContext2D, item: Item) {
+  item.draw(context);
+}
+
+function redrawCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  for (const item of drawingDocument.items) {
+    drawItem(ctx, item);
+  }
+
+  if (currentStroke !== null) {
+    currentStroke.draw(ctx);
+  }
+}
+
+function cancelDrawing() {
+  const pointerId = activePointerId;
+
+  isDrawing = false;
+  currentStroke = null;
+  activePointerId = null;
+
+  if (pointerId !== null && canvas.hasPointerCapture(pointerId)) {
+    canvas.releasePointerCapture(pointerId);
+  }
+
+  redrawCanvas();
+}
+
 function undo() {
   if (isDrawing) {
     return;
   }
 
   const item = drawingDocument.items.pop();
+
   if (item) {
     redoStack.push(item);
     redrawCanvas();
   }
 }
 
-// Redoes the most recently undone action
 function redo() {
-  if (isDrawing) return;
+  if (isDrawing) {
+    return;
+  }
 
   const item = redoStack.pop();
+
   if (item) {
     drawingDocument.items.push(item);
     redrawCanvas();
@@ -218,60 +351,6 @@ function getPointerPosition(event: PointerEvent): Point {
   };
 }
 
-// Draws a stored stroke or sticker onto any canvas context
-function drawItem(context: CanvasRenderingContext2D, item: Item) {
-  if (item.kind === "sticker") {
-    context.drawImage(item.image, item.x, item.y);
-    return;
-  }
-
-  if (item.points.length === 0) {
-    return;
-  }
-
-  context.strokeStyle = item.color;
-  context.fillStyle = item.color;
-  context.lineWidth = item.lineWidth;
-
-  if (item.points.length === 1) {
-    const point = item.points[0];
-
-    context.beginPath();
-    context.arc(
-      point.x,
-      point.y,
-      item.lineWidth / 2,
-      0,
-      Math.PI * 2,
-    );
-    context.fill();
-    return;
-  }
-
-  context.beginPath();
-  context.moveTo(item.points[0].x, item.points[0].y);
-
-  for (let i = 1; i < item.points.length; i++) {
-    context.lineTo(item.points[i].x, item.points[i].y);
-  }
-
-  context.stroke();
-}
-
-// Redraws all saved items on the canvas
-function redrawCanvas() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  for (const item of drawingDocument.items) {
-    drawItem(ctx, item);
-  }
-
-  if (currentStroke !== null) {
-    drawItem(ctx, currentStroke);
-  }
-}
-
-// Turns the current strokes into a cropped, transparent sticker
 function createStickerFromDrawing(): HTMLCanvasElement | null {
   const strokes = drawingDocument.items.filter(
     (item): item is Stroke => item.kind === "stroke",
@@ -303,12 +382,10 @@ function createStickerFromDrawing(): HTMLCanvasElement | null {
   sticker.height = Math.max(1, Math.ceil(maxY - minY));
 
   const stickerCtx = sticker.getContext("2d")!;
-  stickerCtx.lineCap = "round";
-  stickerCtx.lineJoin = "round";
-  stickerCtx.translate(-minX, -minY); // shifts the drawing to (0, 0)
+  stickerCtx.translate(-minX, -minY);
 
   for (const stroke of strokes) {
-    drawItem(stickerCtx, stroke);
+    stroke.draw(stickerCtx);
   }
 
   return sticker;
@@ -334,9 +411,21 @@ function addStickerButton(sticker: HTMLCanvasElement, name = "Sticker") {
   button.append(image);
 
   button.addEventListener("click", () => {
-    // Clicking the selected sticker again deselects it
-    selectedSticker = selectedSticker === sticker ? null : sticker;
-    canvas.style.cursor = selectedSticker ? "copy" : "crosshair";
+    // Selecting a tool cancels any unfinished gesture
+    if (isDrawing) {
+      cancelDrawing();
+    }
+
+    // Clicking the selected sticker again switches back to the brush
+    if (selectedTool.kind === "sticker" && selectedTool.sticker === sticker) {
+      selectedTool = { kind: "brush" };
+    } else {
+      selectedTool = { kind: "sticker", sticker };
+    }
+
+    canvas.style.cursor = selectedTool.kind === "sticker"
+      ? "copy"
+      : "crosshair";
 
     // Removes the highlight from all thumbnails
     for (const child of Array.from(stickerBar.children)) {
@@ -344,7 +433,7 @@ function addStickerButton(sticker: HTMLCanvasElement, name = "Sticker") {
     }
 
     // Highlights the selected sticker or brush
-    if (selectedSticker) {
+    if (selectedTool.kind === "sticker") {
       button.style.outline = "3px solid dodgerblue";
     } else {
       brushButton.style.outline = "3px solid dodgerblue";
@@ -354,9 +443,13 @@ function addStickerButton(sticker: HTMLCanvasElement, name = "Sticker") {
   stickerBar.append(button);
 }
 
-// Switches back to the brush and deselects the current sticker
+// Switches back to the brush without changing committed content
 brushButton.addEventListener("click", () => {
-  selectedSticker = null;
+  if (isDrawing) {
+    cancelDrawing();
+  }
+
+  selectedTool = { kind: "brush" };
   canvas.style.cursor = "crosshair";
 
   // Removes the highlight from all thumbnails
@@ -401,13 +494,11 @@ submitToolButton.addEventListener("click", () => {
   stickerCtx.fillStyle = "black";
   stickerCtx.fillText(content, 60, 40, 116);
 
-  // Adds the custom sticker to the shared collection
+  // Adds the custom sticker to the shared collection of tools
   stickers.push(sticker);
-
-  // Uses the emoji or text as the custom tool name
   addStickerButton(sticker, content);
 
-  // Clears and hides the form after creating the tool
+  // Creating a tool does not place it on the drawing canvas
   toolContentInput.value = "";
   customToolForm.style.display = "none";
 });
@@ -435,17 +526,18 @@ canvas.addEventListener("pointerdown", (event) => {
 
   const position = getPointerPosition(event);
 
-  // Places the selected sticker instead of drawing
-  if (selectedSticker) {
-    drawingDocument.items.push({
-      kind: "sticker",
-      x: position.x - selectedSticker.width / 2, // centers on the pointer
-      y: position.y - selectedSticker.height / 2,
-      image: selectedSticker,
-    });
+  // Places the selected sticker as a committed command
+  if (selectedTool.kind === "sticker") {
+    drawingDocument.items.push(
+      createStickerCommand(
+        selectedTool.sticker,
+        position.x - selectedTool.sticker.width / 2,
+        position.y - selectedTool.sticker.height / 2,
+      ),
+    );
 
+    // A new committed action clears redo history
     redoStack.length = 0;
-
     redrawCanvas();
     return;
   }
@@ -453,70 +545,89 @@ canvas.addEventListener("pointerdown", (event) => {
   canvas.setPointerCapture(event.pointerId);
 
   isDrawing = true;
+  activePointerId = event.pointerId;
 
-  currentStroke = {
-    kind: "stroke",
-    points: [position],
-    color: ctx.strokeStyle as string,
-    lineWidth: Number(widthSelect.value),
-  };
+  currentStroke = createStroke(
+    [position],
+    ctx.strokeStyle as string,
+    Number(widthSelect.value),
+  );
 
   redrawCanvas();
 });
 
-// Adds points while the user draws
 canvas.addEventListener("pointermove", (event) => {
-  if (!isDrawing || currentStroke === null) {
+  if (
+    !isDrawing ||
+    currentStroke === null ||
+    event.pointerId !== activePointerId
+  ) {
     return;
   }
 
   const position = getPointerPosition(event);
-
   currentStroke.points.push(position);
 
   redrawCanvas();
 });
 
-// Saves the completed stroke in the document
-function finishDrawing() {
-  if (!isDrawing) {
+function finishDrawing(event: PointerEvent) {
+  if (
+    !isDrawing ||
+    currentStroke === null ||
+    event.pointerId !== activePointerId
+  ) {
     return;
   }
 
-  if (currentStroke !== null) {
-    drawingDocument.items.push(currentStroke);
-    redoStack.length = 0; // new stroke invalidates redo history
-    currentStroke = null;
-  }
+  const completedStroke = currentStroke;
 
+  currentStroke = null;
   isDrawing = false;
+  activePointerId = null;
+
+  drawingDocument.items.push(completedStroke);
+
+  redoStack.length = 0;
+
   redrawCanvas();
 }
 
 canvas.addEventListener("pointerup", finishDrawing);
-canvas.addEventListener("pointercancel", finishDrawing);
 
-// Clears the document and redraws the empty canvas
+canvas.addEventListener("pointercancel", (event) => {
+  if (event.pointerId === activePointerId) {
+    cancelDrawing();
+  }
+});
+
+canvas.addEventListener("lostpointercapture", (event) => {
+  if (event.pointerId === activePointerId) {
+    cancelDrawing();
+  }
+});
+
+// Clears the document and discards any unfinished stroke
 clearButton.addEventListener("click", () => {
-  isDrawing = false;
-  currentStroke = null;
+  cancelDrawing();
+
   drawingDocument.items = [];
   redoStack.length = 0;
 
   redrawCanvas();
 });
 
-// Connects undo and redo buttons
 undoButton.addEventListener("click", undo);
 redoButton.addEventListener("click", redo);
 
-// Saves the drawing as a sticker, then clears the canvas
+// Saves the committed drawing as a sticker, then clears the canvas
 makeStickerButton.addEventListener("click", () => {
   if (isDrawing) {
     return;
   }
 
   const sticker = createStickerFromDrawing();
+
   if (!sticker) {
     return;
   }
@@ -530,10 +641,18 @@ makeStickerButton.addEventListener("click", () => {
   redrawCanvas();
 });
 
-// Adds keyboard shortcuts for undo and redo
+// Adds keyboard shortcuts for undo, redo, and canceling a stroke
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && isDrawing) {
+    cancelDrawing();
+    return;
+  }
+
   const modifier = event.ctrlKey || event.metaKey;
-  if (!modifier) return;
+
+  if (!modifier) {
+    return;
+  }
 
   const key = event.key.toLowerCase();
 
