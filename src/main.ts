@@ -33,6 +33,12 @@ const clearButton = document.createElement("button");
 clearButton.textContent = "Clear Canvas";
 clearButton.style.marginTop = "10px";
 
+//Creates undo button
+const undoButton = document.createElement("button");
+undoButton.textContent = "Undo";
+undoButton.style.marginTop = "10px";
+undoButton.style.marginRight = "10px";
+
 // Stores drawing data
 type Point = {
   x: number;
@@ -56,6 +62,17 @@ const drawingDocument: DrawingDocument = {
 // Tracks drawing state
 let isDrawing = false;
 let currentStroke: Stroke | null = null;
+
+function undo() {
+  if (isDrawing) {
+    return; // don't undo mid-stroke
+  }
+  if (drawingDocument.strokes.length === 0) {
+    return;
+  }
+  drawingDocument.strokes.pop();
+  redrawCanvas();
+}
 
 function getPointerPosition(event: PointerEvent): Point {
   const rect = canvas.getBoundingClientRect();
@@ -148,6 +165,9 @@ canvas.addEventListener("pointermove", (event) => {
 
 // Saves the completed stroke in the document
 function finishDrawing() {
+  if (!isDrawing) {
+    return;
+  }
   if (currentStroke !== null) {
     drawingDocument.strokes.push(currentStroke);
     currentStroke = null;
@@ -169,4 +189,14 @@ clearButton.addEventListener("click", () => {
   redrawCanvas();
 });
 
-app.append(heading, message, canvas, clearButton);
+undoButton.addEventListener("click", undo);
+
+document.addEventListener("keydown", (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+    event.preventDefault();
+    undo();
+  }
+});
+
+// Add everything to the page (once)
+app.append(heading, message, canvas, undoButton, clearButton);
