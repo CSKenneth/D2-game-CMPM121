@@ -83,6 +83,41 @@ makeStickerButton.textContent = "Make Sticker";
 makeStickerButton.style.marginTop = "10px";
 makeStickerButton.style.marginRight = "10px";
 
+// Creates custom tool button
+const createToolButton = document.createElement("button");
+createToolButton.textContent = "Create Custom Tool";
+createToolButton.style.marginTop = "10px";
+createToolButton.style.marginRight = "10px";
+
+// Creates a container for the custom tool form
+const customToolForm = document.createElement("div");
+customToolForm.style.marginTop = "10px";
+customToolForm.style.marginBottom = "10px";
+customToolForm.style.display = "none";
+
+// Creates the emoji or text input
+const toolContentInput = document.createElement("input");
+toolContentInput.type = "text";
+toolContentInput.placeholder = "Enter emoji or short text";
+toolContentInput.setAttribute("aria-label", "Emoji or short text");
+
+// Creates the submit button
+const submitToolButton = document.createElement("button");
+submitToolButton.textContent = "Create Tool";
+submitToolButton.style.marginLeft = "5px";
+
+// Creates a cancel button
+const cancelToolButton = document.createElement("button");
+cancelToolButton.textContent = "Cancel";
+cancelToolButton.style.marginLeft = "5px";
+
+// Adds the input and buttons to the form
+customToolForm.append(
+  toolContentInput,
+  submitToolButton,
+  cancelToolButton,
+);
+
 // Creates bar that holds the brush and sticker thumbnails
 const stickerBar = document.createElement("div");
 stickerBar.style.marginTop = "10px";
@@ -149,6 +184,7 @@ const redoStack: Item[] = [];
 const stickers: HTMLCanvasElement[] = [];
 let selectedSticker: HTMLCanvasElement | null = null;
 
+// Undoes the most recent drawing or sticker placement
 function undo() {
   if (isDrawing) {
     return;
@@ -161,6 +197,7 @@ function undo() {
   }
 }
 
+// Redoes the most recently undone action
 function redo() {
   if (isDrawing) return;
 
@@ -171,6 +208,7 @@ function redo() {
   }
 }
 
+// Gets the pointer position relative to the canvas
 function getPointerPosition(event: PointerEvent): Point {
   const rect = canvas.getBoundingClientRect();
 
@@ -220,6 +258,7 @@ function drawItem(context: CanvasRenderingContext2D, item: Item) {
   context.stroke();
 }
 
+// Redraws all saved items on the canvas
 function redrawCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -260,8 +299,8 @@ function createStickerFromDrawing(): HTMLCanvasElement | null {
   }
 
   const sticker = document.createElement("canvas");
-  sticker.width = Math.ceil(maxX - minX);
-  sticker.height = Math.ceil(maxY - minY);
+  sticker.width = Math.max(1, Math.ceil(maxX - minX));
+  sticker.height = Math.max(1, Math.ceil(maxY - minY));
 
   const stickerCtx = sticker.getContext("2d")!;
   stickerCtx.lineCap = "round";
@@ -276,13 +315,21 @@ function createStickerFromDrawing(): HTMLCanvasElement | null {
 }
 
 // Adds a thumbnail button for a sticker
-function addStickerButton(sticker: HTMLCanvasElement) {
+function addStickerButton(sticker: HTMLCanvasElement, name = "Sticker") {
   const button = document.createElement("button");
+  button.title = name;
+  button.setAttribute("aria-label", name);
+  button.style.width = "60px";
+  button.style.height = "50px";
+  button.style.marginRight = "5px";
+  button.style.verticalAlign = "top";
 
   const image = document.createElement("img");
   image.src = sticker.toDataURL("image/png");
+  image.alt = name;
   image.style.height = "40px";
-  image.style.maxWidth = "80px";
+  image.style.maxWidth = "50px";
+  image.style.objectFit = "contain";
 
   button.append(image);
 
@@ -296,8 +343,11 @@ function addStickerButton(sticker: HTMLCanvasElement) {
       (child as HTMLElement).style.outline = "";
     }
 
+    // Highlights the selected sticker or brush
     if (selectedSticker) {
       button.style.outline = "3px solid dodgerblue";
+    } else {
+      brushButton.style.outline = "3px solid dodgerblue";
     }
   });
 
@@ -318,6 +368,64 @@ brushButton.addEventListener("click", () => {
   brushButton.style.outline = "3px solid dodgerblue";
 });
 
+// Shows or hides the custom tool form
+createToolButton.addEventListener("click", () => {
+  if (customToolForm.style.display === "none") {
+    customToolForm.style.display = "block";
+    toolContentInput.focus();
+  } else {
+    customToolForm.style.display = "none";
+  }
+});
+
+// Creates a custom sticker tool from the form input
+submitToolButton.addEventListener("click", () => {
+  const content = toolContentInput.value.trim();
+
+  // Does not create a tool if the input is empty
+  if (content === "") {
+    return;
+  }
+
+  // Creates a transparent canvas for the custom sticker
+  const sticker = document.createElement("canvas");
+  sticker.width = 120;
+  sticker.height = 80;
+
+  const stickerCtx = sticker.getContext("2d")!;
+
+  // Draws the emoji or text onto the sticker
+  stickerCtx.font = "40px sans-serif";
+  stickerCtx.textAlign = "center";
+  stickerCtx.textBaseline = "middle";
+  stickerCtx.fillStyle = "black";
+  stickerCtx.fillText(content, 60, 40, 116);
+
+  // Adds the custom sticker to the shared collection
+  stickers.push(sticker);
+
+  // Uses the emoji or text as the custom tool name
+  addStickerButton(sticker, content);
+
+  // Clears and hides the form after creating the tool
+  toolContentInput.value = "";
+  customToolForm.style.display = "none";
+});
+
+// Allows Enter to create the custom tool
+toolContentInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    submitToolButton.click();
+  }
+});
+
+// Closes the form without creating a tool
+cancelToolButton.addEventListener("click", () => {
+  toolContentInput.value = "";
+  customToolForm.style.display = "none";
+});
+
+// Handles drawing or placing a sticker on the canvas
 canvas.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 && event.pointerType === "mouse") {
     return;
@@ -356,6 +464,7 @@ canvas.addEventListener("pointerdown", (event) => {
   redrawCanvas();
 });
 
+// Adds points while the user draws
 canvas.addEventListener("pointermove", (event) => {
   if (!isDrawing || currentStroke === null) {
     return;
@@ -397,6 +506,7 @@ clearButton.addEventListener("click", () => {
   redrawCanvas();
 });
 
+// Connects undo and redo buttons
 undoButton.addEventListener("click", undo);
 redoButton.addEventListener("click", redo);
 
@@ -412,7 +522,7 @@ makeStickerButton.addEventListener("click", () => {
   }
 
   stickers.push(sticker);
-  addStickerButton(sticker);
+  addStickerButton(sticker, "My Drawing");
 
   drawingDocument.items = [];
   redoStack.length = 0;
@@ -420,6 +530,7 @@ makeStickerButton.addEventListener("click", () => {
   redrawCanvas();
 });
 
+// Adds keyboard shortcuts for undo and redo
 document.addEventListener("keydown", (event) => {
   const modifier = event.ctrlKey || event.metaKey;
   if (!modifier) return;
@@ -462,6 +573,7 @@ function addAssetSticker(url: string) {
   image.src = url;
 }
 
+// List of preset sticker assets
 const assetUrls = [
   crueltyUrl,
   curiosityUrl,
@@ -470,16 +582,20 @@ const assetUrls = [
   verityUrl,
 ];
 
+// Adds the preset stickers to the palette
 for (const url of assetUrls) {
   addAssetSticker(url);
 }
 
+// Adds all interface elements to the page
 app.append(
   heading,
   message,
   widthInput,
   canvas,
   makeStickerButton,
+  createToolButton,
+  customToolForm,
   clearButton,
   undoButton,
   redoButton,
