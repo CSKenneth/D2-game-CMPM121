@@ -33,12 +33,31 @@ const clearButton = document.createElement("button");
 clearButton.textContent = "Clear Canvas";
 clearButton.style.marginTop = "10px";
 
+// Stores drawing data
+type Point = {
+  x: number;
+  y: number;
+};
+
+type Stroke = {
+  points: Point[];
+  color: string;
+  lineWidth: number;
+};
+
+type DrawingDocument = {
+  strokes: Stroke[];
+};
+
+const drawingDocument: DrawingDocument = {
+  strokes: [],
+};
+
 // Tracks drawing state
 let isDrawing = false;
-let lastX = 0;
-let lastY = 0;
+let currentStroke: Stroke | null = null;
 
-function getPointerPosition(event: PointerEvent) {
+function getPointerPosition(event: PointerEvent): Point {
   const rect = canvas.getBoundingClientRect();
 
   return {
@@ -47,9 +66,54 @@ function getPointerPosition(event: PointerEvent) {
   };
 }
 
-// Starts drawing when pointer is pressed down
+// Draws a stored stroke
+function drawStroke(stroke: Stroke) {
+  if (stroke.points.length === 0) {
+    return;
+  }
+
+  ctx.strokeStyle = stroke.color;
+  ctx.fillStyle = stroke.color;
+  ctx.lineWidth = stroke.lineWidth;
+
+  if (stroke.points.length === 1) {
+    const point = stroke.points[0];
+
+    ctx.beginPath();
+    ctx.arc(
+      point.x,
+      point.y,
+      stroke.lineWidth / 2,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+    return;
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+
+  for (let i = 1; i < stroke.points.length; i++) {
+    ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+  }
+
+  ctx.stroke();
+}
+
+function redrawCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  for (const stroke of drawingDocument.strokes) {
+    drawStroke(stroke);
+  }
+
+  if (currentStroke !== null) {
+    drawStroke(currentStroke);
+  }
+}
+
 canvas.addEventListener("pointerdown", (event) => {
-  // Ignore right-clicks and other non-left mouse buttons.
   if (event.button !== 0 && event.pointerType === "mouse") {
     return;
   }
@@ -60,43 +124,49 @@ canvas.addEventListener("pointerdown", (event) => {
   const position = getPointerPosition(event);
 
   isDrawing = true;
-  lastX = position.x;
-  lastY = position.y;
 
-  ctx.beginPath();
-  ctx.arc(lastX, lastY, ctx.lineWidth / 2, 0, Math.PI * 2);
-  ctx.fillStyle = ctx.strokeStyle;
-  ctx.fill();
+  currentStroke = {
+    points: [position],
+    color: ctx.strokeStyle as string,
+    lineWidth: ctx.lineWidth,
+  };
+
+  redrawCanvas();
 });
 
-// Draws the line as pointer moves
 canvas.addEventListener("pointermove", (event) => {
-  // Do not draw unless the user is actively drawing.
-  if (!isDrawing) {
+  if (!isDrawing || currentStroke === null) {
     return;
   }
 
   const position = getPointerPosition(event);
 
-  ctx.beginPath();
-  ctx.moveTo(lastX, lastY);
-  ctx.lineTo(position.x, position.y);
-  ctx.stroke();
+  currentStroke.points.push(position);
 
-  lastX = position.x;
-  lastY = position.y;
+  redrawCanvas();
 });
 
+// Saves the completed stroke in the document
 function finishDrawing() {
+  if (currentStroke !== null) {
+    drawingDocument.strokes.push(currentStroke);
+    currentStroke = null;
+  }
+
   isDrawing = false;
-  ctx.beginPath();
+  redrawCanvas();
 }
 
 canvas.addEventListener("pointerup", finishDrawing);
 canvas.addEventListener("pointercancel", finishDrawing);
 
+// Clears the document and redraws the empty canvas
 clearButton.addEventListener("click", () => {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  isDrawing = false;
+  currentStroke = null;
+  drawingDocument.strokes = [];
+
+  redrawCanvas();
 });
 
 app.append(heading, message, canvas, clearButton);
