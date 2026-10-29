@@ -28,6 +28,29 @@ ctx.lineCap = "round";
 ctx.lineJoin = "round";
 ctx.strokeStyle = "black";
 
+// Creates brush width selector
+const widthInput = document.createElement("label");
+widthInput.textContent = "Brush Width: ";
+
+const widthSelect = document.createElement("select");
+
+const thinOption = document.createElement("option");
+thinOption.value = "2";
+thinOption.textContent = "Thin (2px)";
+
+const mediumOption = document.createElement("option");
+mediumOption.value = "5";
+mediumOption.textContent = "Medim (5px)";
+
+const thickOption = document.createElement("option");
+thickOption.value = "10";
+thickOption.textContent = "Thick (10px)";
+
+widthSelect.append(thinOption, mediumOption, thickOption);
+widthInput.append(widthSelect);
+widthInput.style.display = "block";
+widthInput.style.marginBottom = "10px";
+
 // Creates clear button
 const clearButton = document.createElement("button");
 clearButton.textContent = "Clear Canvas";
@@ -38,6 +61,12 @@ const undoButton = document.createElement("button");
 undoButton.textContent = "Undo";
 undoButton.style.marginTop = "10px";
 undoButton.style.marginRight = "10px";
+
+//creates redo button
+const redoButton = document.createElement("button");
+redoButton.textContent = "Redo";
+redoButton.style.marginTop = "10px";
+redoButton.style.marginRight = "10px";
 
 // Stores drawing data
 type Point = {
@@ -63,15 +92,26 @@ const drawingDocument: DrawingDocument = {
 let isDrawing = false;
 let currentStroke: Stroke | null = null;
 
+const redoStack: Stroke[] = [];
+
 function undo() {
   if (isDrawing) {
-    return; // don't undo mid-stroke
-  }
-  if (drawingDocument.strokes.length === 0) {
     return;
   }
-  drawingDocument.strokes.pop();
-  redrawCanvas();
+  const stroke = drawingDocument.strokes.pop();
+  if (stroke) {
+    redoStack.push(stroke);
+    redrawCanvas();
+  }
+}
+
+function redo() {
+  if (isDrawing) return;
+  const stroke = redoStack.pop();
+  if (stroke) {
+    drawingDocument.strokes.push(stroke);
+    redrawCanvas();
+  }
 }
 
 function getPointerPosition(event: PointerEvent): Point {
@@ -145,7 +185,7 @@ canvas.addEventListener("pointerdown", (event) => {
   currentStroke = {
     points: [position],
     color: ctx.strokeStyle as string,
-    lineWidth: ctx.lineWidth,
+    lineWidth: Number(widthSelect.value),
   };
 
   redrawCanvas();
@@ -170,6 +210,7 @@ function finishDrawing() {
   }
   if (currentStroke !== null) {
     drawingDocument.strokes.push(currentStroke);
+    redoStack.length = 0; // new stroke invalidates redo history
     currentStroke = null;
   }
 
@@ -185,18 +226,35 @@ clearButton.addEventListener("click", () => {
   isDrawing = false;
   currentStroke = null;
   drawingDocument.strokes = [];
+  redoStack.length = 0;
 
   redrawCanvas();
 });
 
 undoButton.addEventListener("click", undo);
+redoButton.addEventListener("click", redo);
 
 document.addEventListener("keydown", (event) => {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+  const modifier = event.ctrlKey || event.metaKey;
+  if (!modifier) return;
+
+  const key = event.key.toLowerCase();
+
+  if (key == "z") {
     event.preventDefault();
     undo();
+  } else if (key === "y") {
+    event.preventDefault();
+    redo();
   }
 });
 
-// Add everything to the page (once)
-app.append(heading, message, canvas, undoButton, clearButton);
+app.append(
+  heading,
+  message,
+  widthInput,
+  canvas,
+  undoButton,
+  redoButton,
+  clearButton,
+);
