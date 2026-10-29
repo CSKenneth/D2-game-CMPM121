@@ -4,6 +4,7 @@ import curiosityUrl from "./assets/curiosity.png";
 import falsityUrl from "./assets/falsity.png";
 import lovityUrl from "./assets/lovity.png";
 import verityUrl from "./assets/verity.png";
+import brushUrl from "./assets/brush.png";
 
 const app = document.querySelector<HTMLElement>("#app")!;
 
@@ -63,27 +64,49 @@ const clearButton = document.createElement("button");
 clearButton.textContent = "Clear Canvas";
 clearButton.style.marginTop = "10px";
 
-//Creates undo button
+// Creates undo button
 const undoButton = document.createElement("button");
 undoButton.textContent = "Undo";
 undoButton.style.marginTop = "10px";
+undoButton.style.marginLeft = "10px";
 undoButton.style.marginRight = "10px";
 
-//creates redo button
+// Creates redo button
 const redoButton = document.createElement("button");
 redoButton.textContent = "Redo";
 redoButton.style.marginTop = "10px";
 redoButton.style.marginRight = "10px";
 
-//Creates make sticker button
+// Creates make sticker button
 const makeStickerButton = document.createElement("button");
 makeStickerButton.textContent = "Make Sticker";
 makeStickerButton.style.marginTop = "10px";
 makeStickerButton.style.marginRight = "10px";
 
-//Creates bar that holds the sticker thumbnails
+// Creates bar that holds the brush and sticker thumbnails
 const stickerBar = document.createElement("div");
 stickerBar.style.marginTop = "10px";
+
+// Creates brush selection button using an image asset
+const brushButton = document.createElement("button");
+brushButton.title = "Brush Mode";
+brushButton.style.width = "60px";
+brushButton.style.height = "50px";
+brushButton.style.marginRight = "5px";
+brushButton.style.verticalAlign = "top";
+brushButton.style.outline = "3px solid dodgerblue";
+
+const brushImage = document.createElement("img");
+brushImage.src = brushUrl;
+brushImage.alt = "Brush";
+brushImage.style.width = "40px";
+brushImage.style.height = "40px";
+brushImage.style.objectFit = "contain";
+
+brushButton.append(brushImage);
+
+// Adds the brush before the sticker thumbnails
+stickerBar.append(brushButton);
 
 // Stores drawing data
 type Point = {
@@ -130,6 +153,7 @@ function undo() {
   if (isDrawing) {
     return;
   }
+
   const item = drawingDocument.items.pop();
   if (item) {
     redoStack.push(item);
@@ -139,6 +163,7 @@ function undo() {
 
 function redo() {
   if (isDrawing) return;
+
   const item = redoStack.pop();
   if (item) {
     drawingDocument.items.push(item);
@@ -266,6 +291,7 @@ function addStickerButton(sticker: HTMLCanvasElement) {
     selectedSticker = selectedSticker === sticker ? null : sticker;
     canvas.style.cursor = selectedSticker ? "copy" : "crosshair";
 
+    // Removes the highlight from all thumbnails
     for (const child of Array.from(stickerBar.children)) {
       (child as HTMLElement).style.outline = "";
     }
@@ -277,6 +303,20 @@ function addStickerButton(sticker: HTMLCanvasElement) {
 
   stickerBar.append(button);
 }
+
+// Switches back to the brush and deselects the current sticker
+brushButton.addEventListener("click", () => {
+  selectedSticker = null;
+  canvas.style.cursor = "crosshair";
+
+  // Removes the highlight from all thumbnails
+  for (const child of Array.from(stickerBar.children)) {
+    (child as HTMLElement).style.outline = "";
+  }
+
+  // Highlights the brush button
+  brushButton.style.outline = "3px solid dodgerblue";
+});
 
 canvas.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 && event.pointerType === "mouse") {
@@ -295,6 +335,7 @@ canvas.addEventListener("pointerdown", (event) => {
       y: position.y - selectedSticker.height / 2,
       image: selectedSticker,
     });
+
     redoStack.length = 0;
 
     redrawCanvas();
@@ -332,6 +373,7 @@ function finishDrawing() {
   if (!isDrawing) {
     return;
   }
+
   if (currentStroke !== null) {
     drawingDocument.items.push(currentStroke);
     redoStack.length = 0; // new stroke invalidates redo history
@@ -437,9 +479,9 @@ app.append(
   message,
   widthInput,
   canvas,
-  undoButton,
-  redoButton,
   makeStickerButton,
   clearButton,
+  undoButton,
+  redoButton,
   stickerBar,
 );
