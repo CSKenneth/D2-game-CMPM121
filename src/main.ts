@@ -7,14 +7,12 @@ import brushUrl from "./assets/brush.png";
 
 const app = document.querySelector<HTMLElement>("#app")!;
 
-// Creates heading and instructions
 const heading = document.createElement("h1");
 heading.textContent = "Draw Your Own Personal Helper Friend!";
 
 const message = document.createElement("p");
 message.textContent = "Click and drag to draw";
 
-// Creates canvas
 const canvas = document.createElement("canvas");
 canvas.width = 800;
 canvas.height = 500;
@@ -28,14 +26,12 @@ canvas.style.backgroundColor = "white";
 canvas.style.cursor = "crosshair";
 canvas.style.touchAction = "none";
 
-// Creates brush
 const ctx = canvas.getContext("2d")!;
 ctx.lineWidth = 4;
 ctx.lineCap = "round";
 ctx.lineJoin = "round";
 ctx.strokeStyle = "black";
 
-// Creates brush width selector
 const widthInput = document.createElement("label");
 widthInput.textContent = "Brush Width: ";
 
@@ -58,76 +54,63 @@ widthInput.append(widthSelect);
 widthInput.style.display = "block";
 widthInput.style.marginBottom = "10px";
 
-// Creates clear button
 const clearButton = document.createElement("button");
 clearButton.textContent = "Clear Canvas";
 clearButton.style.marginTop = "10px";
 
-// Creates undo button
 const undoButton = document.createElement("button");
 undoButton.textContent = "Undo";
 undoButton.style.marginTop = "10px";
 undoButton.style.marginLeft = "10px";
 undoButton.style.marginRight = "10px";
 
-// Creates redo button
 const redoButton = document.createElement("button");
 redoButton.textContent = "Redo";
 redoButton.style.marginTop = "10px";
 redoButton.style.marginRight = "10px";
 
-// Creates make sticker button
 const makeStickerButton = document.createElement("button");
 makeStickerButton.textContent = "Make Sticker";
 makeStickerButton.style.marginTop = "10px";
 makeStickerButton.style.marginRight = "10px";
 
-// Creates custom tool button
 const createToolButton = document.createElement("button");
 createToolButton.textContent = "Create Custom Tool";
 createToolButton.style.marginTop = "10px";
 createToolButton.style.marginRight = "10px";
 
-// Creates export button
 const exportButton = document.createElement("button");
 exportButton.textContent = "Export PNG";
 exportButton.style.marginTop = "10px";
 exportButton.style.marginRight = "10px";
 
-// Creates a container for the custom tool form
 const customToolForm = document.createElement("div");
 customToolForm.style.marginTop = "10px";
 customToolForm.style.marginBottom = "10px";
 customToolForm.style.display = "none";
 
-// Creates the emoji or text input
 const toolContentInput = document.createElement("input");
 toolContentInput.type = "text";
 toolContentInput.placeholder = "Enter emoji or short text";
 toolContentInput.setAttribute("aria-label", "Emoji or short text");
 
-// Creates the submit button
 const submitToolButton = document.createElement("button");
 submitToolButton.textContent = "Create Tool";
 submitToolButton.style.marginLeft = "5px";
 
-// Creates a cancel button
 const cancelToolButton = document.createElement("button");
 cancelToolButton.textContent = "Cancel";
 cancelToolButton.style.marginLeft = "5px";
 
-// Adds the input and buttons to the form
 customToolForm.append(
   toolContentInput,
   submitToolButton,
   cancelToolButton,
 );
 
-// Creates bar that holds the brush and sticker thumbnails
 const stickerBar = document.createElement("div");
 stickerBar.style.marginTop = "10px";
 
-// Creates brush selection button using an image asset
 const brushButton = document.createElement("button");
 brushButton.title = "Brush Mode";
 brushButton.style.width = "60px";
@@ -145,16 +128,13 @@ brushImage.style.objectFit = "contain";
 
 brushButton.append(brushImage);
 
-// Adds the brush before the sticker thumbnails
 stickerBar.append(brushButton);
 
-// Stores drawing data
 type Point = {
   x: number;
   y: number;
 };
 
-// Shared rendering operation for every recorded drawing command
 type DrawingCommand = {
   draw(context: CanvasRenderingContext2D): void;
 };
@@ -173,7 +153,6 @@ type PlacedSticker = DrawingCommand & {
   image: HTMLCanvasElement;
 };
 
-// Strokes and stickers share one list so undo/redo works for both
 type Item = Stroke | PlacedSticker;
 
 type DrawingDocument = {
@@ -184,24 +163,20 @@ const drawingDocument: DrawingDocument = {
   items: [],
 };
 
-// Tracks the currently selected tool separately from drawing data
 type SelectedTool =
   | { kind: "brush" }
   | { kind: "sticker"; sticker: HTMLCanvasElement };
 
 let selectedTool: SelectedTool = { kind: "brush" };
 
-// Tracks the temporary stroke separately from committed content
 let isDrawing = false;
 let currentStroke: Stroke | null = null;
 let activePointerId: number | null = null;
 
 const redoStack: Item[] = [];
 
-// Stores available sticker tools
 const stickers: HTMLCanvasElement[] = [];
 
-// Creates a stroke command that can draw on any canvas context
 function createStroke(
   points: Point[],
   color: string,
@@ -213,7 +188,6 @@ function createStroke(
     color,
     lineWidth,
 
-    // Draws this command using the supplied context
     draw(context) {
       drawStroke(context, stroke);
     },
@@ -222,7 +196,6 @@ function createStroke(
   return stroke;
 }
 
-// Creates a sticker command that can draw on any canvas context
 function createStickerCommand(
   image: HTMLCanvasElement,
   x: number,
@@ -234,7 +207,6 @@ function createStickerCommand(
     y,
     image,
 
-    // Draws this command using the supplied context
     draw(context) {
       context.save();
       context.imageSmoothingEnabled = true;
@@ -247,7 +219,6 @@ function createStickerCommand(
   return sticker;
 }
 
-// Draws a stroke without depending on the interactive canvas context
 function drawStroke(
   context: CanvasRenderingContext2D,
   stroke: Stroke,
@@ -256,7 +227,6 @@ function drawStroke(
     return;
   }
 
-  // Prevents this command's drawing settings from affecting other commands
   context.save();
 
   context.strokeStyle = stroke.color;
@@ -265,7 +235,6 @@ function drawStroke(
   context.lineCap = "round";
   context.lineJoin = "round";
 
-  // Draws a dot if the user only clicked once
   if (stroke.points.length === 1) {
     const point = stroke.points[0];
 
@@ -294,12 +263,10 @@ function drawStroke(
   context.restore();
 }
 
-// Draws any recorded command using the target context
 function drawItem(context: CanvasRenderingContext2D, item: Item) {
   item.draw(context);
 }
 
-// Replays committed commands, in order, onto any context
 function renderItems(context: CanvasRenderingContext2D, items: Item[]) {
   for (const item of items) {
     drawItem(context, item);
@@ -375,7 +342,6 @@ function createStickerFromDrawing(): HTMLCanvasElement | null {
     return null;
   }
 
-  // Finds the bounding box of everything drawn
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -406,7 +372,6 @@ function createStickerFromDrawing(): HTMLCanvasElement | null {
   return sticker;
 }
 
-// Adds a thumbnail button for a sticker
 function addStickerButton(sticker: HTMLCanvasElement, name = "Sticker") {
   const button = document.createElement("button");
   button.title = name;
@@ -426,12 +391,10 @@ function addStickerButton(sticker: HTMLCanvasElement, name = "Sticker") {
   button.append(image);
 
   button.addEventListener("click", () => {
-    // Selecting a tool cancels any unfinished gesture
     if (isDrawing) {
       cancelDrawing();
     }
 
-    // Clicking the selected sticker again switches back to the brush
     if (selectedTool.kind === "sticker" && selectedTool.sticker === sticker) {
       selectedTool = { kind: "brush" };
     } else {
@@ -442,12 +405,10 @@ function addStickerButton(sticker: HTMLCanvasElement, name = "Sticker") {
       ? "copy"
       : "crosshair";
 
-    // Removes the highlight from all thumbnails
     for (const child of Array.from(stickerBar.children)) {
       (child as HTMLElement).style.outline = "";
     }
 
-    // Highlights the selected sticker or brush
     if (selectedTool.kind === "sticker") {
       button.style.outline = "3px solid dodgerblue";
     } else {
@@ -458,7 +419,6 @@ function addStickerButton(sticker: HTMLCanvasElement, name = "Sticker") {
   stickerBar.append(button);
 }
 
-// Switches back to the brush without changing committed content
 brushButton.addEventListener("click", () => {
   if (isDrawing) {
     cancelDrawing();
@@ -467,16 +427,13 @@ brushButton.addEventListener("click", () => {
   selectedTool = { kind: "brush" };
   canvas.style.cursor = "crosshair";
 
-  // Removes the highlight from all thumbnails
   for (const child of Array.from(stickerBar.children)) {
     (child as HTMLElement).style.outline = "";
   }
 
-  // Highlights the brush button
   brushButton.style.outline = "3px solid dodgerblue";
 });
 
-// Shows or hides the custom tool form
 createToolButton.addEventListener("click", () => {
   if (customToolForm.style.display === "none") {
     customToolForm.style.display = "block";
@@ -486,52 +443,43 @@ createToolButton.addEventListener("click", () => {
   }
 });
 
-// Creates a custom sticker tool from the form input
 submitToolButton.addEventListener("click", () => {
   const content = toolContentInput.value.trim();
 
-  // Does not create a tool if the input is empty
   if (content === "") {
     return;
   }
 
-  // Creates a transparent canvas for the custom sticker
   const sticker = document.createElement("canvas");
   sticker.width = 120;
   sticker.height = 80;
 
   const stickerCtx = sticker.getContext("2d")!;
 
-  // Draws the emoji or text onto the sticker
   stickerCtx.font = "40px sans-serif";
   stickerCtx.textAlign = "center";
   stickerCtx.textBaseline = "middle";
   stickerCtx.fillStyle = "black";
   stickerCtx.fillText(content, 60, 40, 116);
 
-  // Adds the custom sticker to the shared collection of tools
   stickers.push(sticker);
   addStickerButton(sticker, content);
 
-  // Creating a tool does not place it on the drawing canvas
   toolContentInput.value = "";
   customToolForm.style.display = "none";
 });
 
-// Allows Enter to create the custom tool
 toolContentInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     submitToolButton.click();
   }
 });
 
-// Closes the form without creating a tool
 cancelToolButton.addEventListener("click", () => {
   toolContentInput.value = "";
   customToolForm.style.display = "none";
 });
 
-// Handles drawing or placing a sticker on the canvas
 canvas.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 && event.pointerType === "mouse") {
     return;
@@ -541,7 +489,6 @@ canvas.addEventListener("pointerdown", (event) => {
 
   const position = getPointerPosition(event);
 
-  // Places the selected sticker as a committed command
   if (selectedTool.kind === "sticker") {
     drawingDocument.items.push(
       createStickerCommand(
@@ -551,7 +498,6 @@ canvas.addEventListener("pointerdown", (event) => {
       ),
     );
 
-    // A new committed action clears redo history
     redoStack.length = 0;
     redrawCanvas();
     return;
@@ -622,7 +568,6 @@ canvas.addEventListener("lostpointercapture", (event) => {
   }
 });
 
-// Clears the document and discards any unfinished stroke
 clearButton.addEventListener("click", () => {
   cancelDrawing();
 
@@ -635,7 +580,6 @@ clearButton.addEventListener("click", () => {
 undoButton.addEventListener("click", undo);
 redoButton.addEventListener("click", redo);
 
-// Saves the committed drawing as a sticker, then clears the canvas
 makeStickerButton.addEventListener("click", () => {
   if (isDrawing) {
     return;
@@ -656,7 +600,6 @@ makeStickerButton.addEventListener("click", () => {
   redrawCanvas();
 });
 
-// Adds keyboard shortcuts for undo, redo, and canceling a stroke
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && isDrawing) {
     cancelDrawing();
@@ -680,14 +623,12 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-// Loads a PNG file, shrinks it if it's large, and adds it as a sticker
 const MAX_ASSET_SIZE = 120;
 
 function addAssetSticker(url: string) {
   const image = new Image();
 
   image.addEventListener("load", () => {
-    // Only shrinks images, never enlarges them
     const scale = Math.min(
       1,
       MAX_ASSET_SIZE / Math.max(image.width, image.height),
@@ -709,7 +650,6 @@ function addAssetSticker(url: string) {
 
 const EXPORT_SCALE = 2;
 
-// Replays the committed document onto a separate, higher-resolution canvas
 function exportDrawing() {
   const exportCanvas = document.createElement("canvas");
   exportCanvas.width = canvas.width * EXPORT_SCALE; // 1600
@@ -717,14 +657,12 @@ function exportDrawing() {
 
   const exportCtx = exportCanvas.getContext("2d")!;
 
-  // Matches the white look of the on-screen canvas
   exportCtx.fillStyle = "white";
   exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
 
   // Same document coordinates, scaled up
   exportCtx.scale(EXPORT_SCALE, EXPORT_SCALE);
 
-  // Committed items only. currentStroke is deliberately excluded.
   renderItems(exportCtx, drawingDocument.items);
 
   exportCanvas.toBlob((blob) => {
@@ -738,14 +676,12 @@ function exportDrawing() {
     link.download = "my-helper-friend.png";
     link.click();
 
-    // Gives the browser time to start the download before freeing the URL
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }, "image/png");
 }
 
 exportButton.addEventListener("click", exportDrawing);
 
-// List of preset sticker assets
 const assetUrls = [
   crueltyUrl,
   curiosityUrl,
@@ -754,12 +690,10 @@ const assetUrls = [
   verityUrl,
 ];
 
-// Adds the preset stickers to the palette
 for (const url of assetUrls) {
   addAssetSticker(url);
 }
 
-// Adds all interface elements to the page
 app.append(
   heading,
   message,
