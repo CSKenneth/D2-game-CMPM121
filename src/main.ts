@@ -88,6 +88,12 @@ createToolButton.textContent = "Create Custom Tool";
 createToolButton.style.marginTop = "10px";
 createToolButton.style.marginRight = "10px";
 
+// Creates export button
+const exportButton = document.createElement("button");
+exportButton.textContent = "Export PNG";
+exportButton.style.marginTop = "10px";
+exportButton.style.marginRight = "10px";
+
 // Creates a container for the custom tool form
 const customToolForm = document.createElement("div");
 customToolForm.style.marginTop = "10px";
@@ -230,7 +236,11 @@ function createStickerCommand(
 
     // Draws this command using the supplied context
     draw(context) {
+      context.save();
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
       context.drawImage(sticker.image, sticker.x, sticker.y);
+      context.restore();
     },
   };
 
@@ -289,12 +299,17 @@ function drawItem(context: CanvasRenderingContext2D, item: Item) {
   item.draw(context);
 }
 
+// Replays committed commands, in order, onto any context
+function renderItems(context: CanvasRenderingContext2D, items: Item[]) {
+  for (const item of items) {
+    drawItem(context, item);
+  }
+}
+
 function redrawCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  for (const item of drawingDocument.items) {
-    drawItem(ctx, item);
-  }
+  renderItems(ctx, drawingDocument.items);
 
   if (currentStroke !== null) {
     currentStroke.draw(ctx);
@@ -692,6 +707,44 @@ function addAssetSticker(url: string) {
   image.src = url;
 }
 
+const EXPORT_SCALE = 2;
+
+// Replays the committed document onto a separate, higher-resolution canvas
+function exportDrawing() {
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width = canvas.width * EXPORT_SCALE; // 1600
+  exportCanvas.height = canvas.height * EXPORT_SCALE; // 1000
+
+  const exportCtx = exportCanvas.getContext("2d")!;
+
+  // Matches the white look of the on-screen canvas
+  exportCtx.fillStyle = "white";
+  exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+  // Same document coordinates, scaled up
+  exportCtx.scale(EXPORT_SCALE, EXPORT_SCALE);
+
+  // Committed items only. currentStroke is deliberately excluded.
+  renderItems(exportCtx, drawingDocument.items);
+
+  exportCanvas.toBlob((blob) => {
+    if (!blob) {
+      return;
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "my-helper-friend.png";
+    link.click();
+
+    // Gives the browser time to start the download before freeing the URL
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, "image/png");
+}
+
+exportButton.addEventListener("click", exportDrawing);
+
 // List of preset sticker assets
 const assetUrls = [
   crueltyUrl,
@@ -715,6 +768,7 @@ app.append(
   makeStickerButton,
   createToolButton,
   customToolForm,
+  exportButton,
   clearButton,
   undoButton,
   redoButton,
