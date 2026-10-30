@@ -28,12 +28,12 @@ https://cskenneth.github.io/D2-game-CMPM121/
    history.
 4. Added changable brushes - Created a thin and thick brush with which gives the user more options to paint with.
 5. make your own stickers, preset veritiy stickers, also changed some text - Created variety preset stickers and also made makeable stick that allows the user to turn
-   their drawing on the canvas into a sticker. Also changed a few variable names and titles. Smelly Code: Found badly named variables that did not fit current code section.
+   their drawing on the canvas into a sticker. Also changed a few variable names and titles. **Smelly Code:** Found badly named variables that did not fit current code section.
 6. Added a brush icon so user can return to brush - Added a brush icon to sticker section that allowed for easy swaping of tools.
 7. Created text stick custom tool - Added a custom tool maker that allowed for users to create stickers using text and emojis.
 8. Changed how strokes are commited - Changed how stroke on the canvas behaves and made it so that when a stroke is canceled there are no accidentally commited object.
 9. added export feature and it works! - Created an export feature that allows the user to save and name their drawing.
-10. Removed unnecessary comments - Removed a bunch of unnecessary comments that was cluttering up the code. Smelly Code: Unnecessary comments
+10. Removed unnecessary comments - Removed a bunch of unnecessary comments that was cluttering up the code. **Smelly Code:** Unnecessary comments
 
 # Developer Guide
 
