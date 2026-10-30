@@ -51,10 +51,14 @@ https://github.com/CSKenneth/D2-game-CMPM121/commits/main/src
 
 # Sources
 
-Used "Canvas tutorial" to create a base canvas. (https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial)
-Used "TypeScript object types" as reference for property modifiers.(https://www.typescriptlang.org/docs/handbook/2/objects.html)
-Used "Save" as reference to help save drawing state.(https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/save)
-Used "Restore" as reference to help restore drawing state.(https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/restore)
+Used "Canvas tutorial" to create a base canvas. (https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial).
+
+Used "TypeScript object types" as reference for property modifiers.(https://www.typescriptlang.org/docs/handbook/2/objects.html).
+
+Used "Save" as reference to help save drawing state.(https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/save).
+
+Used "Restore" as reference to help restore drawing state.(https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/restore).
+
 Ai image generator used to create imagine of paint brush without a background.
 
 # D2 starter
